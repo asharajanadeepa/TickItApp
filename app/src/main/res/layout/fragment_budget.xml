@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/budget_input"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Monthly Budget"
+        android:inputType="numberDecimal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/save_budget_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Set Budget"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/budget_input"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:id="@+id/budget_status"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Current Spending: $0 / $0"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/save_budget_button"
+        android:layout_marginTop="16dp" />
+
+    <TextView
+        android:id="@+id/budget_warning"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Warning: Budget Exceeded!"
+        android:textColor="#FF0000"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/budget_status"
+        android:layout_marginTop="8dp" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
