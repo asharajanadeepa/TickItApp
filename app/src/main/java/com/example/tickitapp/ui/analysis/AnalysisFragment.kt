@@ -5,13 +5,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.tickitapp.R
 import com.example.tickitapp.databinding.FragmentAnalysisBinding
-import com.example.tickitapp.model.Transaction
 import com.example.tickitapp.viewmodel.TransactionViewModel
 import com.github.mikephil.charting.animation.Easing
 import com.github.mikephil.charting.data.PieData
@@ -169,37 +167,23 @@ class AnalysisFragment : Fragment() {
     }
 
     private fun updateCategoryAmounts(categoryAmounts: Map<String, Double>) {
-        // Update individual category TextViews
-        binding.foodExpensesText.text = "Food: ${currencyFormatter.format(categoryAmounts["Food"] ?: 0.0)}"
-        binding.transportExpensesText.text = "Transport: ${currencyFormatter.format(categoryAmounts["Transport"] ?: 0.0)}"
-        binding.billsExpensesText.text = "Bills: ${currencyFormatter.format(categoryAmounts["Bills"] ?: 0.0)}"
-        binding.entertainmentExpensesText.text = "Entertainment: ${currencyFormatter.format(categoryAmounts["Entertainment"] ?: 0.0)}"
-        binding.otherExpensesText.text = "Other: ${currencyFormatter.format(categoryAmounts["Other"] ?: 0.0)}"
-
-        // Update the dynamic list
         binding.categoryAmounts.removeAllViews()
         
-        categoryAmounts.forEach { (category, amount) ->
-            if (amount > 0) {
+        categoryAmounts.entries
+            .filter { it.value > 0 }
+            .sortedByDescending { it.value }
+            .forEach { (category, amount) ->
                 val itemView = layoutInflater.inflate(
-                    android.R.layout.simple_list_item_2,
+                    R.layout.item_category_amount,
                     binding.categoryAmounts,
                     false
                 )
                 
-                itemView.findViewById<TextView>(android.R.id.text1).apply {
-                    text = category
-                    textSize = 16f
-                }
+                itemView.findViewById<TextView>(R.id.categoryName).text = category
+                itemView.findViewById<TextView>(R.id.categoryAmount).text = currencyFormatter.format(amount)
                 
-                itemView.findViewById<TextView>(android.R.id.text2).apply {
-                    text = currencyFormatter.format(amount)
-                    textSize = 14f
-                }
-
                 binding.categoryAmounts.addView(itemView)
             }
-        }
     }
 
     override fun onDestroyView() {

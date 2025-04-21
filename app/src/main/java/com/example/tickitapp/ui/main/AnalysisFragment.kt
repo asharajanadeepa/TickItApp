@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.tickitapp.R
@@ -28,7 +29,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
     private lateinit var database: AppDatabase
     private val currencyFormat = NumberFormat.getCurrencyInstance(Locale.US)
     private val categories = listOf("Food", "Transport", "Bills", "Entertainment", "Other")
-    private val TAG = "AnalysisFragment"
+    private val tag = "AnalysisFragment"
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -39,7 +40,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
             setupPieChart()
             observeTransactions()
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onViewCreated", e)
+            Log.e(tag, "Error in onViewCreated", e)
             showError(getString(R.string.error_init_analysis))
         }
     }
@@ -68,7 +69,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
                 setExtraOffsets(20f, 20f, 20f, 20f)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error in setupPieChart", e)
+            Log.e(tag, "Error in setupPieChart", e)
             showError(getString(R.string.error_init_analysis))
         }
     }
@@ -79,7 +80,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
                 val transactionsFlow: Flow<List<Transaction>> = database.transactionDao().getAllTransactions()
                 transactionsFlow
                     .catch { e ->
-                        Log.e(TAG, "Error collecting transactions", e)
+                        Log.e(tag, "Error collecting transactions", e)
                         showError(getString(R.string.error_loading_transactions))
                     }
                     .collectLatest { transactions ->
@@ -88,7 +89,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
                         }
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in observeTransactions", e)
+                Log.e(tag, "Error in observeTransactions", e)
                 showError(getString(R.string.error_loading_transactions))
             }
         }
@@ -118,21 +119,37 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
                 totalIncomeText.text = currencyFormat.format(totalIncome)
                 totalExpensesText.text = currencyFormat.format(totalExpenses)
                 balanceText.text = currencyFormat.format(totalIncome - totalExpenses)
-
-                // Update category text views
-                foodExpensesText.text = currencyFormat.format(categoryExpenses["Food"])
-                transportExpensesText.text = currencyFormat.format(categoryExpenses["Transport"])
-                billsExpensesText.text = currencyFormat.format(categoryExpenses["Bills"])
-                entertainmentExpensesText.text = currencyFormat.format(categoryExpenses["Entertainment"])
-                otherExpensesText.text = currencyFormat.format(categoryExpenses["Other"])
             }
+
+            // Update category amounts in the LinearLayout
+            updateCategoryAmounts(categoryExpenses)
 
             // Update pie chart with category expenses
             updatePieChartData(categoryExpenses)
         } catch (e: Exception) {
-            Log.e(TAG, "Error in updateUI", e)
+            Log.e(tag, "Error in updateUI", e)
             showError(getString(R.string.error_update_display))
         }
+    }
+
+    private fun updateCategoryAmounts(categoryExpenses: Map<String, Double>) {
+        binding.categoryAmounts.removeAllViews()
+        
+        categoryExpenses.entries
+            .filter { it.value > 0 }
+            .sortedByDescending { it.value }
+            .forEach { (category, amount) ->
+                val itemView = layoutInflater.inflate(
+                    R.layout.item_category_amount,
+                    binding.categoryAmounts,
+                    false
+                )
+                
+                itemView.findViewById<TextView>(R.id.categoryName).text = category
+                itemView.findViewById<TextView>(R.id.categoryAmount).text = currencyFormat.format(amount)
+                
+                binding.categoryAmounts.addView(itemView)
+            }
     }
 
     private fun updatePieChartData(categoryExpenses: Map<String, Double>) {
@@ -181,7 +198,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
             try {
                 Snackbar.make(requireView(), message, Snackbar.LENGTH_LONG).show()
             } catch (e: Exception) {
-                Log.e(TAG, "Error showing error message", e)
+                Log.e(tag, "Error showing error message", e)
             }
         }
     }
