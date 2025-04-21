@@ -63,12 +63,17 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         Log.d(TAG, "onViewCreated called")
         
         try {
-            _binding = FragmentHomeBinding.bind(view)
+        _binding = FragmentHomeBinding.bind(view)
             Log.d(TAG, "View binding successful")
 
             // Initialize database and backup manager
             database = AppDatabase.getDatabase(requireContext())
             backupManager = BackupManager(requireContext())
+
+            // Set up export text button
+            binding.exportTextButton.setOnClickListener {
+                exportAsTextFile()
+            }
 
             // Set up category dropdown
             Log.d(TAG, "Categories loaded: ${categories.size} items")
@@ -184,6 +189,99 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
     }
 
+    private fun exportAsTextFile() {
+        lifecycleScope.launch {
+            try {
+                val transactions = withContext(Dispatchers.IO) {
+                    database.transactionDao().getAllTransactionsList()
+                }
+                val fileName = backupManager.exportAsText(transactions)
+                Snackbar.make(
+                    binding.root,
+                    "Text file exported to Downloads: $fileName",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "Text export failed: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Text export failed: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun backupData() {
+        lifecycleScope.launch {
+            try {
+                val transactions = withContext(Dispatchers.IO) {
+                    database.transactionDao().getAllTransactionsList()
+                }
+                val backupPath = backupManager.exportData(transactions)
+                Snackbar.make(
+                    binding.root,
+                    "Backup saved to: $backupPath",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "Backup failed: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Backup failed: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun showRestoreDialog() {
+        val backupFiles = backupManager.getBackupFiles()
+        if (backupFiles.isEmpty()) {
+            Snackbar.make(
+                binding.root,
+                "No backup files found",
+                Snackbar.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val fileNames = backupFiles.map { it.name }.toTypedArray()
+        AlertDialog.Builder(requireContext())
+            .setTitle("Select Backup to Restore")
+            .setItems(fileNames) { _, which ->
+                restoreData(fileNames[which])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun restoreData(fileName: String) {
+        lifecycleScope.launch {
+            try {
+                val transactions = backupManager.importData(fileName)
+                withContext(Dispatchers.IO) {
+                    database.transactionDao().deleteAllTransactions()
+                    transactions.forEach { transaction ->
+                        database.transactionDao().insertTransaction(transaction)
+                    }
+                }
+                Snackbar.make(
+                    binding.root,
+                    "Data restored successfully",
+                    Snackbar.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "Restore failed: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Restore failed: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
     private fun showEditDialog(transaction: Transaction) {
         val dialogBinding = DialogEditTransactionBinding.inflate(layoutInflater)
         
@@ -223,13 +321,13 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 val category = dialogBinding.categorySpinner.selectedItem?.toString() ?: categories[0]
                 val isIncome = dialogBinding.incomeRadio.isChecked
 
-                if (title.isEmpty() || amount.isEmpty()) {
-                    Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+            if (title.isEmpty() || amount.isEmpty()) {
+                Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
-                }
-                val amountValue = amount.toDoubleOrNull()
-                if (amountValue == null || amountValue <= 0) {
-                    Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
+            }
+            val amountValue = amount.toDoubleOrNull()
+            if (amountValue == null || amountValue <= 0) {
+                Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
 
@@ -302,76 +400,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             threshold = 1
         }
         binding.expenseRadio.isChecked = true
-    }
-
-    private fun backupData() {
-        lifecycleScope.launch {
-            try {
-                val transactions = withContext(Dispatchers.IO) {
-                    database.transactionDao().getAllTransactionsList()
-                }
-                val backupPath = backupManager.exportData(transactions)
-                Snackbar.make(
-                    binding.root,
-                    "Backup saved to: $backupPath",
-                    Snackbar.LENGTH_LONG
-                ).show()
-            } catch (e: Exception) {
-                Log.e(TAG, "Backup failed: ${e.message}", e)
-                Snackbar.make(
-                    binding.root,
-                    "Backup failed: ${e.message}",
-                    Snackbar.LENGTH_LONG
-                ).show()
-            }
-        }
-    }
-
-    private fun showRestoreDialog() {
-        val backupFiles = backupManager.getBackupFiles()
-        if (backupFiles.isEmpty()) {
-            Snackbar.make(
-                binding.root,
-                "No backup files found",
-                Snackbar.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        val fileNames = backupFiles.map { it.name }.toTypedArray()
-        AlertDialog.Builder(requireContext())
-            .setTitle("Select Backup to Restore")
-            .setItems(fileNames) { _, which ->
-                restoreData(fileNames[which])
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun restoreData(fileName: String) {
-        lifecycleScope.launch {
-            try {
-                val transactions = backupManager.importData(fileName)
-                withContext(Dispatchers.IO) {
-                    database.transactionDao().deleteAllTransactions()
-                    transactions.forEach { transaction ->
-                        database.transactionDao().insertTransaction(transaction)
-                    }
-                }
-                Snackbar.make(
-                    binding.root,
-                    "Data restored successfully",
-                    Snackbar.LENGTH_SHORT
-                ).show()
-            } catch (e: Exception) {
-                Log.e(TAG, "Restore failed: ${e.message}", e)
-                Snackbar.make(
-                    binding.root,
-                    "Restore failed: ${e.message}",
-                    Snackbar.LENGTH_LONG
-                ).show()
-            }
-        }
     }
 
     override fun onDestroyView() {

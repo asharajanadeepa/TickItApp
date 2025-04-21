@@ -110,6 +110,19 @@
         app:layout_constraintTop_toBottomOf="@id/type_radio_group"
         android:layout_marginTop="8dp" />
 
+    <!-- Add this before the RecyclerView -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/exportTextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Export as Text File"
+        android:textAllCaps="false"
+        app:icon="@android:drawable/ic_menu_save"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/save_button" />
+
     <!-- RecyclerView for transaction list -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/transaction_list"
@@ -119,7 +132,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/save_button"
+        app:layout_constraintTop_toBottomOf="@id/exportTextButton"
         android:layout_marginTop="16dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
