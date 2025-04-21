@@ -6,7 +6,7 @@ import java.util.*
 
 class BudgetManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("budget_prefs", Context.MODE_PRIVATE)
-    private val notificationHelper = NotificationHelper(context)
+    private val notificationManager = NotificationManager(context)
 
     companion object {
         const val KEY_MONTHLY_BUDGET = "monthly_budget"
@@ -37,10 +37,10 @@ class BudgetManager(context: Context) {
 
         when {
             currentSpending > monthlyBudget -> {
-                notificationHelper.showBudgetAlert(currentSpending, monthlyBudget, false)
+                notificationManager.showBudgetAlert(currentSpending, monthlyBudget, false)
             }
             currentSpending >= monthlyBudget * BUDGET_WARNING_THRESHOLD -> {
-                notificationHelper.showBudgetAlert(currentSpending, monthlyBudget, true)
+                notificationManager.showBudgetAlert(currentSpending, monthlyBudget, true)
             }
         }
     }
@@ -60,7 +60,7 @@ class BudgetManager(context: Context) {
 
         if (currentDate.get(Calendar.DAY_OF_YEAR) != lastNotification.get(Calendar.DAY_OF_YEAR) ||
             currentDate.get(Calendar.YEAR) != lastNotification.get(Calendar.YEAR)) {
-            notificationHelper.showExpenseReminder()
+            notificationManager.showExpenseReminder()
             lastNotificationDate = System.currentTimeMillis()
         }
     }

@@ -6,7 +6,10 @@ import android.util.Log
 import android.view.*
 import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.tickitapp.R
@@ -34,32 +37,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         resources.getStringArray(R.array.categories)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.home_menu, menu)
-        super.onCreateOptionsMenu(menu, inflater)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_backup -> {
-                backupData()
-                true
-            }
-            R.id.action_restore -> {
-                showRestoreDialog()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setupMenu()
         Log.d(TAG, "onViewCreated called")
         
         try {
@@ -80,14 +60,12 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             
             val dropdownAdapter = ArrayAdapter(
                 requireContext(),
-                android.R.layout.simple_dropdown_item_1line,
+                R.layout.dropdown_item,
                 categories
-            ).apply {
-                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            }
+            )
             binding.categorySpinner.apply {
                 setAdapter(dropdownAdapter)
-                setText(categories[0], false)
+                setText(categories.firstOrNull() ?: "", false)
                 threshold = 1
             }
             Log.d(TAG, "Category dropdown setup complete")
@@ -187,6 +165,29 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         } catch (e: Exception) {
             Log.e(TAG, "Error in onViewCreated: ${e.message}", e)
         }
+    }
+
+    private fun setupMenu() {
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.home_menu, menu)
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                return when (menuItem.itemId) {
+                    R.id.action_backup -> {
+                        backupData()
+                        true
+                    }
+                    R.id.action_restore -> {
+                        showRestoreDialog()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
     }
 
     private fun exportAsTextFile() {

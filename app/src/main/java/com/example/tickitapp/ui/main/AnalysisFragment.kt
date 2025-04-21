@@ -13,13 +13,12 @@ import com.example.tickitapp.model.Transaction
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
-import com.github.mikephil.charting.formatter.PercentFormatter
 import com.github.mikephil.charting.formatter.ValueFormatter
 import com.google.android.material.snackbar.Snackbar
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.*
 
@@ -41,7 +40,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
             observeTransactions()
         } catch (e: Exception) {
             Log.e(TAG, "Error in onViewCreated", e)
-            showError("Failed to initialize analysis view")
+            showError(getString(R.string.error_init_analysis))
         }
     }
 
@@ -61,7 +60,7 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
                 legend.orientation = com.github.mikephil.charting.components.Legend.LegendOrientation.HORIZONTAL
                 legend.setDrawInside(false)
                 setUsePercentValues(true)
-                setCenterText("Expenses by Category")
+                setCenterText(getString(R.string.expenses_by_category))
                 setCenterTextSize(16f)
                 setTouchEnabled(true)
                 setHighlightPerTapEnabled(true)
@@ -70,27 +69,27 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in setupPieChart", e)
-            showError("Failed to setup chart")
+            showError(getString(R.string.error_init_analysis))
         }
     }
 
     private fun observeTransactions() {
-        if (!isAdded || isDetached) return
-
         lifecycleScope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    database.transactionDao().getAllTransactions().collectLatest { transactions ->
+                val transactionsFlow: Flow<List<Transaction>> = database.transactionDao().getAllTransactions()
+                transactionsFlow
+                    .catch { e ->
+                        Log.e(TAG, "Error collecting transactions", e)
+                        showError(getString(R.string.error_loading_transactions))
+                    }
+                    .collectLatest { transactions ->
                         if (isAdded && !isDetached) {
-                            withContext(Dispatchers.Main) {
-                                updateUI(transactions)
-                            }
+                            updateUI(transactions)
                         }
                     }
-                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in observeTransactions", e)
-                showError("Failed to load transactions")
+                showError(getString(R.string.error_loading_transactions))
             }
         }
     }
@@ -101,84 +100,70 @@ class AnalysisFragment : Fragment(R.layout.fragment_analysis) {
         try {
             var totalIncome = 0.0
             var totalExpenses = 0.0
-            val categoryExpenses = mutableMapOf<String, Double>()
-
-            // Initialize all categories with 0.0
-            categories.forEach { category ->
-                categoryExpenses[category] = 0.0
-            }
+            val categoryExpenses = categories.associateWith { 0.0 }.toMutableMap()
 
             // Process transactions
-            transactions.forEach { transaction ->
+            for (transaction in transactions) {
                 if (transaction.isIncome) {
                     totalIncome += transaction.amount
                 } else {
                     totalExpenses += transaction.amount
-                    val category = if (transaction.category in categories) transaction.category else "Other"
+                    val category = transaction.category.takeIf { it in categories } ?: "Other"
                     categoryExpenses[category] = (categoryExpenses[category] ?: 0.0) + transaction.amount
                 }
             }
 
-            // Update text views
-            binding.totalIncomeText.text = currencyFormat.format(totalIncome)
-            binding.totalExpensesText.text = currencyFormat.format(totalExpenses)
-            binding.balanceText.text = currencyFormat.format(totalIncome - totalExpenses)
+            // Update text views with currency formatted values
+            binding.apply {
+                totalIncomeText.text = currencyFormat.format(totalIncome)
+                totalExpensesText.text = currencyFormat.format(totalExpenses)
+                balanceText.text = currencyFormat.format(totalIncome - totalExpenses)
 
-            // Update category text views
-            binding.foodExpensesText.text = currencyFormat.format(categoryExpenses["Food"])
-            binding.transportExpensesText.text = currencyFormat.format(categoryExpenses["Transport"])
-            binding.billsExpensesText.text = currencyFormat.format(categoryExpenses["Bills"])
-            binding.entertainmentExpensesText.text = currencyFormat.format(categoryExpenses["Entertainment"])
-            binding.otherExpensesText.text = currencyFormat.format(categoryExpenses["Other"])
+                // Update category text views
+                foodExpensesText.text = currencyFormat.format(categoryExpenses["Food"])
+                transportExpensesText.text = currencyFormat.format(categoryExpenses["Transport"])
+                billsExpensesText.text = currencyFormat.format(categoryExpenses["Bills"])
+                entertainmentExpensesText.text = currencyFormat.format(categoryExpenses["Entertainment"])
+                otherExpensesText.text = currencyFormat.format(categoryExpenses["Other"])
+            }
 
             // Update pie chart with category expenses
-            updatePieChart(categoryExpenses)
+            updatePieChartData(categoryExpenses)
         } catch (e: Exception) {
             Log.e(TAG, "Error in updateUI", e)
-            showError("Failed to update display")
+            showError(getString(R.string.error_update_display))
         }
     }
 
-    private fun updatePieChart(categoryExpenses: Map<String, Double>) {
-        try {
-            val entries = mutableListOf<PieEntry>()
-            val colors = mutableListOf<Int>()
-            
-            // Add non-zero categories
-            categoryExpenses.forEach { (category, amount) ->
-                if (amount > 0) {
-                    entries.add(PieEntry(amount.toFloat(), category))
-                    colors.add(getCategoryColor(category))
-                }
-            }
+    private fun updatePieChartData(categoryExpenses: Map<String, Double>) {
+        val entries = categoryExpenses
+            .filter { it.value > 0 }
+            .map { (category, amount) -> PieEntry(amount.toFloat(), category) }
 
-            if (entries.isNotEmpty()) {
-                val dataSet = PieDataSet(entries, "Expenses by Category").apply {
-                    this.colors = colors
-                    valueTextSize = 14f
-                    valueTextColor = Color.BLACK
-                    valueFormatter = object : ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            return currencyFormat.format(value.toDouble())
-                        }
-                    }
-                    setDrawValues(true)
-                    yValuePosition = PieDataSet.ValuePosition.OUTSIDE_SLICE
-                }
-
-                binding.pieChart.data = PieData(dataSet).apply {
-                    setValueTextSize(14f)
-                    setValueTextColor(Color.BLACK)
-                }
-                binding.pieChart.invalidate()
-            } else {
-                binding.pieChart.clear()
-                binding.pieChart.invalidate()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in updatePieChart", e)
-            showError("Failed to update chart")
+        if (entries.isEmpty()) {
+            binding.pieChart.setNoDataText(getString(R.string.no_expenses_recorded))
+            binding.pieChart.invalidate()
+            return
         }
+
+        val dataSet = PieDataSet(entries, getString(R.string.expenses_by_category))
+        dataSet.colors = entries.map { getCategoryColor(it.label) }
+        dataSet.valueTextSize = 14f
+        dataSet.valueTextColor = Color.BLACK
+        dataSet.valueFormatter = object : ValueFormatter() {
+            override fun getFormattedValue(value: Float): String {
+                return currencyFormat.format(value.toDouble())
+            }
+        }
+        dataSet.setDrawValues(true)
+        dataSet.yValuePosition = PieDataSet.ValuePosition.OUTSIDE_SLICE
+
+        val pieData = PieData(dataSet)
+        pieData.setValueTextSize(14f)
+        pieData.setValueTextColor(Color.BLACK)
+
+        binding.pieChart.data = pieData
+        binding.pieChart.invalidate()
     }
 
     private fun getCategoryColor(category: String): Int {

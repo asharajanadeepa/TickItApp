@@ -12,7 +12,7 @@ import com.example.tickitapp.R
 import java.text.NumberFormat
 import java.util.*
 
-class NotificationHelper(private val context: Context) {
+class NotificationManager(private val context: Context) {
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
 
