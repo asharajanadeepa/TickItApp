@@ -43,7 +43,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         Log.d(TAG, "onViewCreated called")
         
         try {
-        _binding = FragmentHomeBinding.bind(view)
+            _binding = FragmentHomeBinding.bind(view)
             Log.d(TAG, "View binding successful")
 
             // Initialize database and backup manager
@@ -55,7 +55,30 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 exportAsTextFile()
             }
 
-            // Set up category dropdown
+            setupCategoryDropdown()
+            setupRecyclerView()
+
+            // Save transaction
+            binding.saveButton.setOnClickListener {
+                saveTransaction()
+            }
+
+            // Observe transactions
+            observeTransactions()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onViewCreated: ${e.message}", e)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        setupCategoryDropdown()
+    }
+
+    private fun setupCategoryDropdown() {
+        try {
+            Log.d(TAG, "Setting up category dropdown")
             Log.d(TAG, "Categories loaded: ${categories.size} items")
             
             val dropdownAdapter = ArrayAdapter(
@@ -63,108 +86,116 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 R.layout.dropdown_item,
                 categories
             )
+            
             binding.categorySpinner.apply {
                 setAdapter(dropdownAdapter)
                 setText(categories.firstOrNull() ?: "", false)
                 threshold = 1
             }
             Log.d(TAG, "Category dropdown setup complete")
-
-            // Set up RecyclerView with empty list initially
-            transactionAdapter = TransactionAdapter(
-                emptyList(),
-                onEditClick = { transaction -> showEditDialog(transaction) },
-                onDeleteClick = { transaction -> showDeleteConfirmation(transaction) }
-            )
-            binding.transactionList.apply {
-                layoutManager = LinearLayoutManager(context)
-                adapter = transactionAdapter
-            }
-            Log.d(TAG, "RecyclerView set up")
-
-            // Save transaction
-            binding.saveButton.setOnClickListener {
-                val title = binding.titleInput.text.toString().trim()
-                val amountStr = binding.amountInput.text.toString().trim()
-                val selectedCategory = binding.categorySpinner.text.toString()
-                val isIncome = binding.incomeRadio.isChecked
-
-                if (title.isEmpty()) {
-                    binding.titleInputLayout.error = "Please enter a title"
-                    return@setOnClickListener
-                }
-
-                if (amountStr.isEmpty()) {
-                    binding.amountInputLayout.error = "Please enter an amount"
-                    return@setOnClickListener
-                }
-
-                val amount = try {
-                    amountStr.toDouble()
-                } catch (e: NumberFormatException) {
-                    binding.amountInputLayout.error = "Please enter a valid amount"
-                    return@setOnClickListener
-                }
-
-                if (amount <= 0) {
-                    binding.amountInputLayout.error = "Amount must be greater than 0"
-                    return@setOnClickListener
-                }
-
-                lifecycleScope.launch {
-                    try {
-                        val transaction = Transaction(
-                            title = title,
-                            amount = amount,
-                            category = selectedCategory,
-                            date = Date(System.currentTimeMillis()),
-                            isIncome = isIncome
-                        )
-                        
-                        withContext(Dispatchers.IO) {
-                            database.transactionDao().insertTransaction(transaction)
-                        }
-
-                        // Update UI
-                        clearForm()
-                        
-                        // Show success message
-                        Snackbar.make(
-                            binding.root,
-                            "${if (isIncome) "Income" else "Expense"} saved successfully",
-                            Snackbar.LENGTH_SHORT
-                        ).show()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error saving transaction: ${e.message}", e)
-                        // Show error message
-                        Snackbar.make(
-                            binding.root,
-                            "Error saving transaction: ${e.message}",
-                            Snackbar.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }
-
-            // Observe transactions
-            lifecycleScope.launch {
-                try {
-                    database.transactionDao().getAllTransactions().collect { transactions ->
-                        Log.d(TAG, "Received ${transactions.size} transactions from DB")
-                        transactionAdapter?.updateTransactions(transactions)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error observing transactions: ${e.message}", e)
-                    Snackbar.make(
-                        binding.root,
-                        "Error loading transactions: ${e.message}",
-                        Snackbar.LENGTH_LONG
-                    ).show()
-                }
-            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onViewCreated: ${e.message}", e)
+            Log.e(TAG, "Error setting up category dropdown: ${e.message}", e)
         }
+    }
+
+    private fun setupRecyclerView() {
+        transactionAdapter = TransactionAdapter(
+            emptyList(),
+            onEditClick = { transaction -> showEditDialog(transaction) },
+            onDeleteClick = { transaction -> showDeleteConfirmation(transaction) }
+        )
+        binding.transactionList.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = transactionAdapter
+        }
+        Log.d(TAG, "RecyclerView set up")
+    }
+
+    private fun saveTransaction() {
+        val title = binding.titleInput.text.toString().trim()
+        val amountStr = binding.amountInput.text.toString().trim()
+        val selectedCategory = binding.categorySpinner.text.toString()
+        val isIncome = binding.incomeRadio.isChecked
+
+        if (title.isEmpty()) {
+            binding.titleInputLayout.error = "Please enter a title"
+            return
+        }
+
+        if (amountStr.isEmpty()) {
+            binding.amountInputLayout.error = "Please enter an amount"
+            return
+        }
+
+        val amount = try {
+            amountStr.toDouble()
+        } catch (e: NumberFormatException) {
+            binding.amountInputLayout.error = "Please enter a valid amount"
+            return
+        }
+
+        if (amount <= 0) {
+            binding.amountInputLayout.error = "Amount must be greater than 0"
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                val transaction = Transaction(
+                    title = title,
+                    amount = amount,
+                    category = selectedCategory,
+                    date = Date(System.currentTimeMillis()),
+                    isIncome = isIncome
+                )
+                
+                withContext(Dispatchers.IO) {
+                    database.transactionDao().insertTransaction(transaction)
+                }
+
+                // Update UI
+                clearForm()
+                
+                // Show success message
+                Snackbar.make(
+                    binding.root,
+                    "${if (isIncome) "Income" else "Expense"} saved successfully",
+                    Snackbar.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving transaction: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Error saving transaction: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun observeTransactions() {
+        lifecycleScope.launch {
+            try {
+                database.transactionDao().getAllTransactions().collect { transactions ->
+                    Log.d(TAG, "Received ${transactions.size} transactions from DB")
+                    transactionAdapter?.updateTransactions(transactions)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error observing transactions: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Error loading transactions: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun clearForm() {
+        binding.titleInput.text?.clear()
+        binding.amountInput.text?.clear()
+        setupCategoryDropdown()
+        binding.expenseRadio.isChecked = true
     }
 
     private fun setupMenu() {
@@ -382,25 +413,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             }
             .setNegativeButton("Cancel", null)
             .show()
-    }
-
-    private fun clearForm() {
-        binding.titleInput.text?.clear()
-        binding.amountInput.text?.clear()
-        // Reset category spinner with adapter
-        val dropdownAdapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            categories
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-        binding.categorySpinner.apply {
-            setAdapter(dropdownAdapter)
-            setText(categories[0], false)
-            threshold = 1
-        }
-        binding.expenseRadio.isChecked = true
     }
 
     override fun onDestroyView() {
