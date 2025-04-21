@@ -13,6 +13,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC")
     fun getAllTransactionsLiveData(): LiveData<List<Transaction>>
 
+    @Query("SELECT * FROM transactions ORDER BY date DESC")
+    suspend fun getAllTransactionsList(): List<Transaction>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction)
 
@@ -21,6 +24,9 @@ interface TransactionDao {
 
     @Delete
     suspend fun deleteTransaction(transaction: Transaction)
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAllTransactions()
 
     @Query("SELECT SUM(amount) FROM transactions WHERE isIncome = 1")
     fun getTotalIncome(): Flow<Double>

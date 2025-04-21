@@ -3,7 +3,7 @@ package com.example.tickitapp.ui.main
 import android.app.AlertDialog
 import android.os.Bundle
 import android.util.Log
-import android.view.View
+import android.view.*
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -15,6 +15,7 @@ import com.example.tickitapp.data.AppDatabase
 import com.example.tickitapp.databinding.DialogEditTransactionBinding
 import com.example.tickitapp.databinding.FragmentHomeBinding
 import com.example.tickitapp.model.Transaction
+import com.example.tickitapp.utils.BackupManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -27,9 +28,34 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private val binding get() = _binding!!
     private var transactionAdapter: TransactionAdapter? = null
     private lateinit var database: AppDatabase
+    private lateinit var backupManager: BackupManager
     private val TAG = "HomeFragment"
     private val categories: Array<String> by lazy {
         resources.getStringArray(R.array.categories)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setHasOptionsMenu(true)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        inflater.inflate(R.menu.home_menu, menu)
+        super.onCreateOptionsMenu(menu, inflater)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_backup -> {
+                backupData()
+                true
+            }
+            R.id.action_restore -> {
+                showRestoreDialog()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -40,8 +66,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             _binding = FragmentHomeBinding.bind(view)
             Log.d(TAG, "View binding successful")
 
-            // Initialize database
+            // Initialize database and backup manager
             database = AppDatabase.getDatabase(requireContext())
+            backupManager = BackupManager(requireContext())
 
             // Set up category dropdown
             Log.d(TAG, "Categories loaded: ${categories.size} items")
@@ -275,6 +302,76 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             threshold = 1
         }
         binding.expenseRadio.isChecked = true
+    }
+
+    private fun backupData() {
+        lifecycleScope.launch {
+            try {
+                val transactions = withContext(Dispatchers.IO) {
+                    database.transactionDao().getAllTransactionsList()
+                }
+                val backupPath = backupManager.exportData(transactions)
+                Snackbar.make(
+                    binding.root,
+                    "Backup saved to: $backupPath",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "Backup failed: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Backup failed: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun showRestoreDialog() {
+        val backupFiles = backupManager.getBackupFiles()
+        if (backupFiles.isEmpty()) {
+            Snackbar.make(
+                binding.root,
+                "No backup files found",
+                Snackbar.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val fileNames = backupFiles.map { it.name }.toTypedArray()
+        AlertDialog.Builder(requireContext())
+            .setTitle("Select Backup to Restore")
+            .setItems(fileNames) { _, which ->
+                restoreData(fileNames[which])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun restoreData(fileName: String) {
+        lifecycleScope.launch {
+            try {
+                val transactions = backupManager.importData(fileName)
+                withContext(Dispatchers.IO) {
+                    database.transactionDao().deleteAllTransactions()
+                    transactions.forEach { transaction ->
+                        database.transactionDao().insertTransaction(transaction)
+                    }
+                }
+                Snackbar.make(
+                    binding.root,
+                    "Data restored successfully",
+                    Snackbar.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "Restore failed: ${e.message}", e)
+                Snackbar.make(
+                    binding.root,
+                    "Restore failed: ${e.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     override fun onDestroyView() {
