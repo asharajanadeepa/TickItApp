@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Override colors for dark theme -->
+    <color name="background">@color/dark_background</color>
+    <color name="surface">@color/dark_surface</color>
+    <color name="text_primary">@color/white</color>
+    <color name="text_secondary">@color/text_secondary_dark</color>
+    <color name="text_hint">@color/text_hint_dark</color>
+    <color name="divider">#1FFFFFFF</color>
+
+    <!-- Adjust brand colors for dark theme -->
+    <color name="primary_light">#90CAF9</color>
+    <color name="accent_light">#FF80AB</color>
+
+    <!-- Transaction colors with adjusted opacity for dark theme -->
+    <color name="income_green">#B34CAF50</color>
+    <color name="expense_red">#B3F44336</color>
+</resources> 
